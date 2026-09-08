@@ -1,0 +1,100 @@
+# Cloud Workflows, request lifecycle state machine.
+#
+# One workflow for both provision and deprovision: it waits on a human
+# approval callback, then dispatches the matching GitHub Action
+# (provision.yml / deprovision.yml). The Action runs Terraform with OIDC
+# creds and POSTs /api/requests/{id}/complete when done, so this workflow
+# never touches a cloud itself, it only orchestrates humans and CI.
+#
+# The portal app generates the callback_id and stores the external callback
+# URL in Firestore before starting this workflow (see app/workflows.py), so
+# the approve/reject API can resolve the gate directly.
+#
+# The fine-grained GitHub PAT lives in Secret Manager (the single non-OIDC
+# credential in the system, see README / ADR-010).
+main:
+  params: [input]
+  steps:
+    - init:
+        assign:
+          - project_id: ${input.project_id}
+          - location: ${input.location}
+          - request_id: ${input.request_id}
+          - doc_path: ${"projects/" + project_id + "/databases/(default)/documents/requests/" + request_id}
+    - create_callback:
+        call: events.create_callback_endpoint
+        args:
+          http_callback_method: POST
+          callback_id: ${input.callback_id}
+        result: callback
+    - await_approval:
+        call: events.await_callback
+        args:
+          callback: ${callback}
+          timeout: 86400 # approver has 24h
+        result: approval
+    - decide:
+        switch:
+          - condition: ${approval.http_request.body.approved == true}
+            next: get_token
+          - condition: ${approval.http_request.body.rejected == true}
+            next: mark_rejected
+          - condition: true
+            next: mark_invalid
+    - get_token:
+        call: googleapis.secretmanager.v1.projects.secrets.versions.access
+        args:
+          name: ${"projects/" + project_id + "/secrets/github-pat/versions/latest"}
+        result: pat
+    - decode_token:
+        assign:
+          - token: ${text.decode(base64.decode(pat.payload.data))}
+    - dispatch_github:
+        call: http.post
+        args:
+          url: ${"https://api.github.com/repos/" + input.github_owner + "/cloud-vending-machine/actions/workflows/" + input.workflow_file + "/dispatches"}
+          headers:
+            Authorization: ${"Bearer " + token}
+            Accept: "application/vnd.github+json"
+            X-GitHub-Api-Version: "2022-11-28"
+            Content-Type: "application/json"
+          body:
+            ref: main
+            inputs:
+              request_id: ${request_id}
+              cloud: ${input.cloud}
+              resource_type: ${input.resource_type}
+              instance_size: ${input.instance_size}
+        result: dispatch_response
+    - mark_inflight:
+        call: googleapis.firestore.v1.projects.databases.documents.patch
+        args:
+          name: ${doc_path}
+          updateMask: status
+          body:
+            fields:
+              status:
+                stringValue: ${input.phase == "deprovision" ? "deprovisioning" : "provisioning"}
+        next: done
+    - mark_rejected:
+        call: googleapis.firestore.v1.projects.databases.documents.patch
+        args:
+          name: ${doc_path}
+          updateMask: status
+          body:
+            fields:
+              status:
+                stringValue: rejected
+        next: done
+    - mark_invalid:
+        call: googleapis.firestore.v1.projects.databases.documents.patch
+        args:
+          name: ${doc_path}
+          updateMask: status
+          body:
+            fields:
+              status:
+                stringValue: failed
+        next: done
+    - done:
+        return: ${request_id}

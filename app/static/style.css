@@ -1,0 +1,115 @@
+/* Minimal portal styling, no framework, no build step. */
+:root {
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --ink: #1c2430;
+  --muted: #5b6673;
+  --accent: #4285f4;
+  --ok: #1a8a4f;
+  --err: #c0392b;
+  --border: #dde2e8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+header, main, footer {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 1.5rem;
+}
+
+header h1 { font-size: 1.25rem; margin: 0; }
+nav a { color: var(--accent); text-decoration: none; }
+nav a:hover { text-decoration: underline; }
+
+main { padding-top: 1.5rem; padding-bottom: 3rem; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+h2 { margin-top: 0; }
+
+label {
+  display: block;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+input, select {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+button {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.danger { background: var(--err); }
+
+.status {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: #e8ecf1;
+}
+.status-provisioned, .status-deprovisioned { background: #d9f2e3; color: var(--ok); }
+.status-rejected, .status-failed { background: #fbe0dc; color: var(--err); }
+.status-provisioning, .status-deprovisioning { background: #e3eefa; color: var(--accent); }
+
+.request { border-top: 1px solid var(--border); padding: 0.75rem 0; }
+.request pre {
+  background: var(--bg);
+  padding: 0.5rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+
+.ok { color: var(--ok); }
+.err { color: var(--err); }
+.note { color: var(--muted); font-size: 0.85rem; }
+
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
+dt { color: var(--muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+
+footer {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding-bottom: 2rem;
+}

@@ -1,0 +1,142 @@
+name: provision
+
+# Dispatched by the Cloud Workflows approval gate. Inputs come from a public
+# web form, so they are validated again here, workflow_dispatch inputs are
+# untrusted (defense in depth: the portal API validates first).
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: "Portal request id"
+        required: true
+        type: string
+      cloud:
+        description: "aws | gcp"
+        required: true
+        type: choice
+        options: [aws, gcp]
+      resource_type:
+        description: "ec2 | s3 | iam_user | gce | gcs | service_account"
+        required: true
+        type: string
+      instance_size:
+        description: "Instance size (instances only)"
+        required: false
+        type: string
+
+permissions:
+  id-token: write # OIDC to AWS / GCP WIF
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate untrusted inputs
+        run: |
+          [[ "${{ inputs.request_id }}" =~ ^[a-z0-9-]{8,36}$ ]] || { echo "invalid request_id"; exit 1; }
+          case "${{ inputs.cloud }}-${{ inputs.resource_type }}" in
+            aws-ec2|aws-s3|aws-iam_user|gcp-gce|gcp-gcs|gcp-service_account) ;;
+            *) echo "cloud/resource_type mismatch"; exit 1 ;;
+          esac
+          case "${{ inputs.resource_type }}" in
+            ec2)
+              case "${{ inputs.instance_size }}" in t3.micro|t3.small) ;; *) echo "ec2 requires t3.micro|t3.small"; exit 1 ;; esac ;;
+            gce)
+              case "${{ inputs.instance_size }}" in e2-micro|e2-small) ;; *) echo "gce requires e2-micro|e2-small"; exit 1 ;; esac ;;
+          esac
+
+  aws:
+    needs: validate
+    if: inputs.cloud == 'aws'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/aws
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ">=1.15"
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_PROVISION_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: terraform apply (per-request state)
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.AWS_STATE_BUCKET }}" \
+            -backend-config="key=requests/${{ inputs.request_id }}/terraform.tfstate" \
+            -backend-config="region=${{ secrets.AWS_REGION }}" \
+            -input=false
+          cat > request.tfvars <<EOF
+          resource_type = "${{ inputs.resource_type }}"
+          request_id    = "${{ inputs.request_id }}"
+          instance_size = "${{ inputs.instance_size }}"
+          EOF
+          terraform apply -auto-approve -input=false -var-file=request.tfvars
+          terraform output -json request > outputs.json
+      - name: Report success to the portal
+        if: vars.PORTAL_URL != ''
+        run: |
+          curl -sf -X POST "${{ vars.PORTAL_URL }}/api/requests/${{ inputs.request_id }}/complete" \
+            -H "X-Callback-Token: ${{ secrets.PORTAL_CALLBACK_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --argjson outputs "$(cat outputs.json)" '{status: "provisioned", outputs: $outputs}')"
+      - name: Report failure to the portal
+        if: failure() && vars.PORTAL_URL != ''
+        run: |
+          curl -sf -X POST "${{ vars.PORTAL_URL }}/api/requests/${{ inputs.request_id }}/complete" \
+            -H "X-Callback-Token: ${{ secrets.PORTAL_CALLBACK_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"status": "failed", "message": "terraform apply failed, see this GitHub run"}'
+
+  gcp:
+    needs: validate
+    if: inputs.cloud == 'gcp'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/gcp
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ">=1.15"
+      - name: Fail fast when GCP is not live yet
+        if: vars.GCP_PROJECT_ID == ''
+        run: |
+          echo "GCP is code-first on this project, apply platform/gcp first (see README)."
+          exit 1
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_WIF_SA }}
+      - name: terraform apply (per-request state)
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.GCP_STATE_BUCKET }}" \
+            -backend-config="prefix=requests/${{ inputs.request_id }}" \
+            -input=false
+          cat > request.tfvars <<EOF
+          project_id     = "${{ vars.GCP_PROJECT_ID }}"
+          resource_type  = "${{ inputs.resource_type }}"
+          request_id     = "${{ inputs.request_id }}"
+          instance_size  = "${{ inputs.instance_size }}"
+          EOF
+          terraform apply -auto-approve -input=false -var-file=request.tfvars
+          terraform output -json request > outputs.json
+      - name: Report success to the portal
+        if: vars.PORTAL_URL != ''
+        run: |
+          curl -sf -X POST "${{ vars.PORTAL_URL }}/api/requests/${{ inputs.request_id }}/complete" \
+            -H "X-Callback-Token: ${{ secrets.PORTAL_CALLBACK_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --argjson outputs "$(cat outputs.json)" '{status: "provisioned", outputs: $outputs}')"
+      - name: Report failure to the portal
+        if: failure() && vars.PORTAL_URL != ''
+        run: |
+          curl -sf -X POST "${{ vars.PORTAL_URL }}/api/requests/${{ inputs.request_id }}/complete" \
+            -H "X-Callback-Token: ${{ secrets.PORTAL_CALLBACK_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"status": "failed", "message": "terraform apply failed, see this GitHub run"}'

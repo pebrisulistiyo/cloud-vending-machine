@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Admin, Self-Service Portal{% endblock %}
+{% block content %}
+<section class="card">
+  <h2>Approvals</h2>
+  <label>Approval token
+    <input id="token" type="password" autocomplete="off" placeholder="X-Approval-Token">
+  </label>
+  <button id="load">Load pending requests</button>
+  <div id="pending"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadPending() {
+  const token = document.getElementById("token").value;
+  const res = await fetch("/api/requests", { headers: { "X-Approval-Token": token } });
+  const list = await res.json();
+  const pending = document.getElementById("pending");
+  if (!res.ok) {
+    pending.innerHTML = `<p class="err">${list.detail ?? "forbidden"}</p>`;
+    return;
+  }
+  pending.innerHTML = list
+    .filter((r) => r.status === "pending")
+    .map((r) => `
+      <article class="request">
+        <strong>${r.request_id}</strong>
+        <span>${r.cloud} / ${r.resource_type}, by ${r.requester}</span>
+        <pre>${JSON.stringify(r.params, null, 2)}</pre>
+        <div class="actions">
+          <button onclick="decide('${r.request_id}', true, '${token}')">Approve</button>
+          <button class="danger" onclick="decide('${r.request_id}', false, '${token}')">Reject</button>
+        </div>
+      </article>`)
+    .join("") || "<p>No pending requests.</p>";
+
+  const provisioned = list.filter((r) => r.status === "provisioned");
+  if (provisioned.length) {
+    pending.insertAdjacentHTML("beforeend", "<h3>Provisioned (tear down)</h3>" +
+      provisioned.map((r) => `
+        <article class="request">
+          <strong>${r.request_id}</strong>
+          <span>${r.cloud} / ${r.resource_type}</span>
+          <button class="danger" onclick="deprovision('${r.request_id}', '${token}')">Deprovision</button>
+        </article>`).join(""));
+  }
+}
+
+async function decide(id, approved, token) {
+  const endpoint = approved ? "approve" : "reject";
+  const res = await fetch(`/api/requests/${id}/${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Approval-Token": token,
+    },
+    body: JSON.stringify({ approved, rejected: !approved }),
+  });
+  const body = await res.json();
+  if (!res.ok) { alert(body.detail ?? "error"); }
+  loadPending();
+}
+
+async function deprovision(id, token) {
+  const res = await fetch(`/api/requests/${id}/deprovision`, {
+    method: "POST",
+    headers: { "X-Approval-Token": token },
+  });
+  const body = await res.json();
+  if (!res.ok) { alert(body.detail ?? "error"); }
+  loadPending();
+}
+
+document.getElementById("load").addEventListener("click", loadPending);
+</script>
+{% endblock %}

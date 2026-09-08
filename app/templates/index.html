@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Request a resource, Self-Service Portal{% endblock %}
+{% block content %}
+<section class="card">
+  <h2>Request a resource</h2>
+  <p>Pick a cloud and a resource. An approver reviews it, then Terraform
+     provisions it via GitHub Actions (OIDC, no static keys).</p>
+
+  <form id="request-form">
+    <label>Your name
+      <input name="requester" required minlength="2" maxlength="64" placeholder="Ada Lovelace">
+    </label>
+
+    <label>Cloud
+      <select name="cloud" id="cloud">
+        <option value="aws">AWS</option>
+        <option value="gcp">GCP</option>
+      </select>
+    </label>
+
+    <label>Resource type
+      <select name="resource_type" id="resource-type">
+        <option value="ec2">EC2 instance (SSM-managed)</option>
+        <option value="s3">S3 bucket</option>
+        <option value="iam_user">IAM user (read-only)</option>
+        <option value="gce">GCE instance</option>
+        <option value="gcs">GCS bucket</option>
+        <option value="service_account">Service account (viewer)</option>
+      </select>
+    </label>
+
+    <label id="size-label" hidden>Instance size
+      <select name="instance_size" id="instance-size">
+        <option value="t3.micro">t3.micro</option>
+        <option value="t3.small">t3.small</option>
+      </select>
+    </label>
+
+    <button type="submit">Submit request</button>
+  </form>
+
+  <div id="result" hidden></div>
+</section>
+
+<section class="card">
+  <h2>Check a request</h2>
+  <form id="lookup-form">
+    <label>Request ID
+      <input name="request_id" required pattern="[a-z0-9-]{8,36}" placeholder="e.g. demo-ec2-0001">
+    </label>
+    <button type="submit">View status</button>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+const RESOURCE_TYPES = {
+  aws: { ec2: "EC2 instance (SSM-managed)", s3: "S3 bucket", iam_user: "IAM user (read-only)" },
+  gcp: { gce: "GCE instance", gcs: "GCS bucket", service_account: "Service account (viewer)" },
+};
+const SIZES = {
+  aws: { "t3.micro": "t3.micro", "t3.small": "t3.small" },
+  gcp: { "e2-micro": "e2-micro", "e2-small": "e2-small" },
+};
+
+const cloudEl = document.getElementById("cloud");
+const typeEl = document.getElementById("resource-type");
+const sizeLabel = document.getElementById("size-label");
+const sizeEl = document.getElementById("instance-size");
+
+function refreshResourceTypes() {
+  const types = RESOURCE_TYPES[cloudEl.value];
+  typeEl.innerHTML = "";
+  for (const [value, label] of Object.entries(types)) {
+    typeEl.insertAdjacentHTML("beforeend",
+      `<option value="${value}">${label}</option>`);
+  }
+  refreshSizes();
+}
+
+function refreshSizes() {
+  const sizes = SIZES[cloudEl.value];
+  sizeEl.innerHTML = "";
+  for (const [value, label] of Object.entries(sizes)) {
+    sizeEl.insertAdjacentHTML("beforeend",
+      `<option value="${value}">${label}</option>`);
+  }
+  const needsSize = ["ec2", "gce"].includes(typeEl.value);
+  sizeLabel.hidden = !needsSize;
+}
+
+cloudEl.addEventListener("change", refreshResourceTypes);
+typeEl.addEventListener("change", refreshSizes);
+refreshResourceTypes();
+
+document.getElementById("request-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const payload = {
+    request_id: crypto.randomUUID().slice(0, 12),
+    requester: f.get("requester"),
+    cloud: f.get("cloud"),
+    resource_type: f.get("resource_type"),
+  };
+  if (["ec2", "gce"].includes(payload.resource_type)) {
+    payload.instance_size = f.get("instance_size");
+  }
+  const res = await fetch("/api/requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json();
+  const result = document.getElementById("result");
+  result.hidden = false;
+  if (res.ok) {
+    result.innerHTML = `<p class="ok">Request created! Track it:
+      <a href="/requests/${body.request_id}">${body.request_id}</a></p>`;
+  } else {
+    result.innerHTML = `<p class="err">Error: ${body.detail ?? JSON.stringify(body)}</p>`;
+  }
+});
+
+document.getElementById("lookup-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const id = new FormData(e.target).get("request_id");
+  window.location.href = `/requests/${encodeURIComponent(id)}`;
+});
+</script>
+{% endblock %}

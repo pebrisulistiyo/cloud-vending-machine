@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Request {{ r.request_id }}, Self-Service Portal{% endblock %}
+{% block content %}
+<section class="card">
+  <h2>Request <code>{{ r.request_id }}</code></h2>
+  <dl>
+    <dt>Status</dt>
+    <dd><span class="status status-{{ r.status }}">{{ r.status }}</span></dd>
+    <dt>Requester</dt><dd>{{ r.requester }}</dd>
+    <dt>Cloud</dt><dd>{{ r.cloud }}</dd>
+    <dt>Resource</dt><dd>{{ r.resource_type }}</dd>
+    <dt>Created</dt><dd>{{ r.created_at }}</dd>
+    {% if r.github_run_url %}
+    <dt>Provisioning run</dt><dd><a href="{{ r.github_run_url }}">{{ r.github_run_url }}</a></dd>
+    {% endif %}
+    {% if r.message %}<dt>Message</dt><dd>{{ r.message }}</dd>{% endif %}
+  </dl>
+
+  {% if r.outputs %}
+  <h3>Provisioned resources</h3>
+  <pre>{{ r.outputs | tojson(indent=2) }}</pre>
+  <p class="note">Credentials (if any) are shown once. Store them now, this
+     page is public by design, so treat outputs as transient.</p>
+  {% endif %}
+</section>
+{% endblock %}

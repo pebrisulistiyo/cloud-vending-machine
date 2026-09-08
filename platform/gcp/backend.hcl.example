@@ -1,0 +1,9 @@
+# Copy to backend.hcl and fill in, then:  terraform init -backend-config=backend.hcl
+# backend.hcl is gitignored.
+#
+# This module's own state bucket is created ONCE BY HAND (chicken-and-egg
+# see ../README): a GCS bucket in asia-southeast1 with versioning on. It then
+# creates the shared eko-portfolio-tfstate-gcp bucket (statebucket.tf) that
+# every other repo uses.
+bucket = "eko-portfolio-tfstate-platform" # create this one by hand, globally unique
+prefix = "platform/gcp"

@@ -1,0 +1,34 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Local config that may contain secrets / env-specific values
+*.tfvars
+!*.tfvars.example
+backend.hcl
+!backend.hcl.example
+outputs.json
+request.tfvars
+plan.txt
+
+# DO commit .terraform.lock.hcl — it pins provider hashes for reproducible builds.
+!.terraform.lock.hcl
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# OS
+.DS_Store

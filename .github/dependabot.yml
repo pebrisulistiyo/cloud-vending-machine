@@ -1,0 +1,14 @@
+# Automated dependency updates. pip PRs trigger app-ci, so every bump runs
+# the full gate chain before merge.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /app
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

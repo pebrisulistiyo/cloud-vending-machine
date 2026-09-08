@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Not found, Self-Service Portal{% endblock %}
+{% block content %}
+<section class="card">
+  <h2>Request <code>{{ request_id }}</code> not found</h2>
+  <p>Check the id, or <a href="/">submit a new request</a>.</p>
+</section>
+{% endblock %}
