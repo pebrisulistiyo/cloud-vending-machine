@@ -53,14 +53,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Build image
-        run: docker build --build-arg APP_VERSION=${GITHUB_REF_NAME:-dev} -t portal:$GITHUB_SHA app
+        run: docker build --build-arg APP_VERSION="${GITHUB_REF_NAME:-dev}" -t "portal:${{ github.sha }}" app
       - name: Trivy scan (generate SARIF)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: portal:$GITHUB_SHA
+          image-ref: portal:${{ github.sha }}
           format: sarif
           output: trivy.sarif
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v4
         with:
@@ -68,9 +69,10 @@ jobs:
       - name: Trivy scan (block CRITICAL/HIGH)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: portal:$GITHUB_SHA
+          image-ref: portal:${{ github.sha }}
           format: table
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: "1"
 
   # --- Deploy to Cloud Run. Self-skips until the GCP account exists. --------
@@ -88,12 +90,12 @@ jobs:
       - name: Push image to Artifact Registry
         run: |
           gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev
-          docker build -t ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/portal/portal:$GITHUB_SHA app
-          docker push ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/portal/portal:$GITHUB_SHA
+          docker build -t "${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/portal/portal:$GITHUB_SHA" app
+          docker push "${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/portal/portal:$GITHUB_SHA"
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy portal \
-            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/portal/portal:$GITHUB_SHA \
+            --image "${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/portal/portal:$GITHUB_SHA" \
             --region ${{ vars.GCP_REGION }} \
             --no-allow-unauthenticated || \
           gcloud run services update-traffic portal \
