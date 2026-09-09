@@ -13,6 +13,11 @@ on:
         required: true
         type: boolean
         default: false
+      apply_aws:
+        description: "Apply platform/aws (only when the AWS account exists)"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -28,6 +33,7 @@ jobs:
       - uses: terraform-linters/setup-tflint@v6
       - name: tflint
         run: |
+          tflint --chdir=platform/aws
           tflint --chdir=platform/gcp
           tflint --chdir=terraform/aws
           tflint --chdir=terraform/gcp
@@ -49,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dir: [platform/gcp, terraform/aws, terraform/gcp]
+        dir: [platform/aws, platform/gcp, terraform/aws, terraform/gcp]
     steps:
       - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v4
@@ -60,6 +66,31 @@ jobs:
         run: |
           terraform init -backend=false -input=false
           terraform validate -no-color
+
+  # --- AWS apply: manual, only once the AWS account exists ------------------
+  apply-aws:
+    if: github.event_name == 'workflow_dispatch' && inputs.apply_aws && vars.AWS_PLATFORM_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform/aws
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ">=1.15"
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_PLATFORM_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+      - name: terraform apply
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.AWS_STATE_BUCKET }}" \
+            -backend-config="key=platform/aws/terraform.tfstate" \
+            -backend-config="region=${{ secrets.AWS_REGION }}" \
+            -input=false
+          terraform apply -auto-approve -input=false
 
   # --- GCP apply: manual, only once the account exists ----------------------
   apply-gcp:
