@@ -3,13 +3,15 @@
 # so the runtime stage stays on python:slim with a non-root user.
 FROM python:3.14-slim AS builder
 WORKDIR /build
+RUN python -m venv /venv
+ENV PATH="/venv/bin:$PATH"
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.14-slim
 WORKDIR /app
-COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /venv /venv
+ENV PATH="/venv/bin:$PATH"
 COPY . ./app
 
 # Semver (vMAJOR.MINOR.PATCH) injected by CI from the git tag or branch.
