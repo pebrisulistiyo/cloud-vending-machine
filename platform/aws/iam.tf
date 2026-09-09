@@ -88,17 +88,18 @@ data "aws_iam_policy_document" "provision_assume" {
 
 data "aws_iam_policy_document" "provision_permissions" {
   statement {
-    sid     = "EC2Read"
-    effect  = "Allow"
-    actions = ["ec2:Describe*", "ec2:Get*"]
+    sid       = "EC2Read"
+    effect    = "Allow"
+    actions   = ["ec2:Describe*", "ec2:Get*"]
     resources = ["*"]
   }
 
   statement {
-    sid     = "EC2Create"
-    effect  = "Allow"
-    actions = ["ec2:RunInstances", "ec2:CreateTags"]
+    sid       = "EC2Create"
+    effect    = "Allow"
+    actions   = ["ec2:RunInstances", "ec2:CreateTags"]
     resources = ["*"]
+
     condition {
       test     = "StringEquals"
       variable = "aws:RequestedRegion"
@@ -107,10 +108,11 @@ data "aws_iam_policy_document" "provision_permissions" {
   }
 
   statement {
-    sid     = "DenyOversizedInstances"
-    effect  = "Deny"
-    actions = ["ec2:RunInstances"]
+    sid       = "DenyOversizedInstances"
+    effect    = "Deny"
+    actions   = ["ec2:RunInstances"]
     resources = ["arn:aws:ec2:*:*:instance/*"]
+
     condition {
       test     = "StringNotEquals"
       variable = "ec2:InstanceType"
@@ -119,10 +121,11 @@ data "aws_iam_policy_document" "provision_permissions" {
   }
 
   statement {
-    sid     = "EC2Terminate"
-    effect  = "Allow"
-    actions = ["ec2:TerminateInstances", "ec2:DeleteTags"]
+    sid       = "EC2Terminate"
+    effect    = "Allow"
+    actions   = ["ec2:TerminateInstances", "ec2:DeleteTags"]
     resources = ["*"]
+
     condition {
       test     = "StringEquals"
       variable = "aws:ResourceTag/ManagedBy"
@@ -131,10 +134,11 @@ data "aws_iam_policy_document" "provision_permissions" {
   }
 
   statement {
-    sid     = "PassInstanceRole"
-    effect  = "Allow"
-    actions = ["iam:PassRole"]
+    sid       = "PassInstanceRole"
+    effect    = "Allow"
+    actions   = ["iam:PassRole"]
     resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/portfolio-portal-instance"]
+
     condition {
       test     = "StringEquals"
       variable = "iam:PassedToService"
@@ -143,15 +147,15 @@ data "aws_iam_policy_document" "provision_permissions" {
   }
 
   statement {
-    sid     = "GetInstanceProfile"
-    effect  = "Allow"
-    actions = ["iam:GetInstanceProfile"]
+    sid       = "GetInstanceProfile"
+    effect    = "Allow"
+    actions   = ["iam:GetInstanceProfile"]
     resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/portfolio-portal-instance"]
   }
 
   statement {
-    sid    = "TerraformState"
-    effect = "Allow"
+    sid     = "TerraformState"
+    effect  = "Allow"
     actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetBucketVersioning"]
     resources = [
       "arn:aws:s3:::${var.state_bucket}",
@@ -229,10 +233,11 @@ data "aws_iam_policy_document" "provision_permissions" {
   }
 
   statement {
-    sid    = "DenyOutOfRegion"
-    effect = "Deny"
-    actions = ["ec2:RunInstances", "s3:CreateBucket"]
+    sid       = "DenyOutOfRegion"
+    effect    = "Deny"
+    actions   = ["ec2:RunInstances", "s3:CreateBucket"]
     resources = ["*"]
+
     condition {
       test     = "StringNotEquals"
       variable = "aws:RequestedRegion"

@@ -1,6 +1,16 @@
 # Per-request GCP resources. Code-first like everything GCP: valid today,
 # applied once the platform/gcp foundation is live.
 
+terraform {
+  required_version = ">= 1.15"
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 8.0"
+    }
+  }
+}
+
 variable "project_id" {
   description = "GCP project resources are created in."
   type        = string
@@ -42,6 +52,7 @@ data "google_compute_image" "debian" {
 resource "google_compute_instance" "this" {
   count = var.resource_type == "gce" ? 1 : 0
 
+  project      = var.project_id
   name         = "portal-${var.request_id}"
   machine_type = var.instance_size
   zone         = "${var.region}-a"
@@ -64,6 +75,7 @@ resource "google_compute_instance" "this" {
 resource "google_storage_bucket" "this" {
   count = var.resource_type == "gcs" ? 1 : 0
 
+  project                  = var.project_id
   name                     = "portal-requests-${var.request_id}"
   location                 = var.region
   public_access_prevention = "enforced"
@@ -78,6 +90,7 @@ resource "google_storage_bucket" "this" {
 resource "google_service_account" "this" {
   count = var.resource_type == "service_account" ? 1 : 0
 
+  project      = var.project_id
   account_id   = "portal-sa-${var.request_id}"
   display_name = "Portal requested SA ${var.request_id}"
 }

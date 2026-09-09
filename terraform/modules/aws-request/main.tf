@@ -2,6 +2,16 @@
 # module serves all of them, and the provision role (terraform-bootstrap)
 # stays the only permission boundary.
 
+terraform {
+  required_version = ">= 1.15"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+}
+
 variable "request_id" {
   description = "Portal request id (also the Terraform state key)."
   type        = string
