@@ -20,8 +20,8 @@ jobs:
       run:
         working-directory: app
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
@@ -41,7 +41,7 @@ jobs:
       security-events: write
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: github/codeql-action/init@v4
         with:
           languages: python
@@ -51,22 +51,27 @@ jobs:
   build-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build image
         run: docker build --build-arg APP_VERSION=${GITHUB_REF_NAME:-dev} -t portal:$GITHUB_SHA app
-      - name: Trivy scan (block CRITICAL/HIGH)
+      - name: Trivy scan (generate SARIF)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: portal:$GITHUB_SHA
           format: sarif
           output: trivy.sarif
           severity: CRITICAL,HIGH
-          exit-code: "1"
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
         with:
           sarif_file: trivy.sarif
+      - name: Trivy scan (block CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: portal:$GITHUB_SHA
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
 
   # --- Deploy to Cloud Run. Self-skips until the GCP account exists. --------
   deploy-gcp:
@@ -74,7 +79,7 @@ jobs:
     needs: [lint-test, build-scan]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}

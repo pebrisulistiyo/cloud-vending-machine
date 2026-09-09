@@ -19,8 +19,8 @@ jobs:
       run:
         working-directory: app
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
@@ -38,22 +38,27 @@ jobs:
     needs: gates
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build image (version from tag)
         run: docker build --build-arg APP_VERSION=${{ github.ref_name }} -t portal:${{ github.ref_name }} app
-      - name: Trivy scan (block CRITICAL/HIGH)
+      - name: Trivy scan (generate SARIF)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: portal:${{ github.ref_name }}
           format: sarif
           output: trivy.sarif
           severity: CRITICAL,HIGH
-          exit-code: "1"
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
         with:
           sarif_file: trivy.sarif
+      - name: Trivy scan (block CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: portal:${{ github.ref_name }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
 
   deploy:
     needs: build
@@ -61,7 +66,7 @@ jobs:
     if: vars.GCP_PROJECT_ID != ''
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
@@ -91,7 +96,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:

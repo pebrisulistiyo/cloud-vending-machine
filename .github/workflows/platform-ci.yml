@@ -24,7 +24,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: terraform-linters/setup-tflint@v6
       - name: tflint
         run: |
@@ -38,7 +38,7 @@ jobs:
   fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ">=1.15"
@@ -51,7 +51,7 @@ jobs:
       matrix:
         dir: [platform/gcp, terraform/aws, terraform/gcp]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ">=1.15"
@@ -69,7 +69,7 @@ jobs:
       run:
         working-directory: platform/gcp
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ">=1.15"
