@@ -23,7 +23,20 @@ resource "google_billing_budget" "monthly" {
     threshold_percent = 1.0
   }
 
-  # No all_updates_rule: alerts go to the billing account's default IAM
-  # recipients (the account owner). A pubsub_topic for custom delivery is
-  # the obvious upgrade if a second watcher joins.
+  all_updates_rule {
+    monitoring_notification_channels = [
+      google_monitoring_notification_channel.budget_email.id,
+    ]
+    disable_default_iam_recipients = false
+  }
+}
+
+resource "google_monitoring_notification_channel" "budget_email" {
+  project      = var.gcp_project_id
+  display_name = "Budget Alert Email"
+  type         = "email"
+  labels = {
+    email_address = var.alert_email
+  }
+  depends_on = [google_project_service.apis]
 }

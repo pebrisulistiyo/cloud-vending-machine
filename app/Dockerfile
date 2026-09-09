@@ -10,7 +10,7 @@ FROM python:3.14-slim
 WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
-COPY app ./app
+COPY . ./app
 
 # Semver (vMAJOR.MINOR.PATCH) injected by CI from the git tag or branch.
 ARG APP_VERSION=dev
